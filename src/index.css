@@ -1,13 +1,254 @@
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+stbc2 and 3
+groups and info 
+
+STD3DCS0003.stbc3.jstest3.net
+std3dcs0103.stbc3.jstest3.net
++++++++++++++++++++
+
+$cred =Get-Credential
+$SER ="STD2DCS0005.stbc2.jstest2.net"
+$csv = Import-Csv "C:\Temp\Boooo1.csv"
+Foreach($l in $csv)
+{
+
+$Name = $l.Name
+$u =Get-adgroup $Name -Server $SER -Credential $cred -Properties info, description | select name, info, description 
+#$u.memberof
+$u| export-csv -path "C:\Temp\New folder\unh1.csv" -Append -NoTypeInformation
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+=====================================
+
+Get member of 
++++++++++++++++++++++++++++
+$cred =Get-Credential
+$SER ="STD2DCS0005.stbc2.jstest2.net"
+$Name = "ACCADMINT2108"
+$u = Get-ADUser $Name -Properties memberOf -Server $SER -Credential $cred
+$u.Memberof
+
+
+
+
+
+
+
+$csv = Import-Csv "C:\Temp\Book1.csv"
+
+ForEach ($l in $csv)
+{
+Write-Host "tASK NO:"
+$task=Read-Host
+$Name = $l.Name
+
+$Sowner= $l.Sowner
+$Sowner= $Sowner-split ";"
+foreach($u in $Sowner)
+
+
+{
+
+$bre=Get-ADUser $u -Properties mail| select -ExpandProperty mail
+Write-Output "
+SCTASK$task
+hi $bre
+hi $Name
+"
+
+}
+
+}
+
+
+11111111111111111111111111111111111111
+
+
+Function MailSend
+{
+
+$csv = Import-Csv "C:\Temp\Book1.csv"
+Write-Host "Name :"
+$value = Read-Host
+Write-Host "Task :"
+$task = Read-Host
+
+ForEach ($l in $csv)
+{
+$Name = $l.Name
+$Sowner= $l.Sowner
+
+$body28= Write-Output @"
+<font face="Calibri"><p>Hello,</p>
+
+<br/>
+
+Your request for a new distribution list has now been completed. 
+<br/>
+<br/>
+Distribution List Name :  $Name  
+<br/>
+Distribution List Owner(s) : $Sowner    
+
+<br/>
+
+<br/>
+Owners of the list are able to add and remove members using the Search Directory application in Windows 10, Please make sure if you connected with sainsburys network\VPN before doing any changes. please see instructions attached. 
+<br/>
+Please call the DT Service Desk on 0345 603 4401 if you have any problems." 
+<br/><br/><br/>
+Thanks & Regards
+<br/>
+$value
+<br/>
+Tata Consultancy Services Ltd
+<br/>
+Sainsbury’s Tech Security Admin
+<br/>
+TCS – Infrastructure
+<br/>
+$value@sainsburys.co.uk
+<br/>
+0345 603 2638
+<br/></font>
+"@
+
+
+
+
+$to = "Nagalingam.S@sainsburys.co.uk"
+$from = "DTSA.Requests@sainsburys.co.uk"
+$server="10.175.30.25"
+$subject28 = "New Distribution List Request - *DLNAME* - $task"
+
+Send-MailMessage -to $to -from $from -SmtpServer $server -BodyAsHtml:$true -Body $body28 -Subject $subject28
+#Script end
+
+}
+}
+
+
+
+MailSend
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1111111111111111111111111111111111111111111111111111111111111
+
+
+
+
+$csv = Import-Csv "C:\Temp\book22.csv"
+$validUsers = @()
+$invalidUsers = @()
+
+foreach($l in $csv)
+{
+    $Name =  $l.Name
+    try
+    {
+        $user = Get-ADUser $Name -ErrorAction Stop
+        $validUsers += $user
+    }
+    catch
+    {
+        $invalidUsers += $Name
+    }
+}
+
+$validUsers | Export-Csv -path C:\Temp\boook.csv -NoTypeInformation
+$invalidUsers | Export-Csv -path C:\Temp\boook1.csv -NoTypeInformation
+
+
+222222222222222222222222222222222222222222222222222222222222222222222222222222222222
+
+ 
+$csv = Import-Csv "C:\Temp\hyh.csv"
+$validUsers = @()
+$invalidUsers = New-Object System.Collections.Generic.List[Object]
+
+foreach ($l in $csv) {
+    $Name = $l.Name
+try {
+        $user = Get-ADUser $Name -ErrorAction Stop
+        $validUsers += $user
+    }
+catch 
+    {
+   $invalidUser = New-Object PSObject -Property @{Name = $Name}
+        $invalidUsers.Add($invalidUser)
+    }
+    }
+
+$validUsers | Export-Csv -Path C:\Temp\book.csv -NoTypeInformation
+$invalidUsers | Export-Csv -Path "C:\Temp\book1.csv" -NoTypeInformation
+
+
+
+
+333333333333333333333333333333333333333333333333333333333333333333333333333333333333
+
+$csv = Import-Csv "C:\Temp\Boooo1.csv"
+Foreach($l in $csv)
+{
+
+$Name = $l.Name
+$u =Get-ADUser -filter {EmailAddress -eq $Name } -Properties sAMAccountName | select name, sAMAccountName
+$u
+}
+
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+$csv = Import-Csv "C:\Temp\Boooo1.csv"
+Foreach($l in $csv)
+{
+
+$Name = $l.Name
+$u =Get-ADGroup $Name -Properties Description  | select name, Description
+$u| export-csv -path "C:\Temp\stsaqs.csv" -Append -NoTypeInformation
+}
+
+
+
+
+Foreach ($u in $Sowner)
+{
+
+    
+
+$uname = Get-ADUser $u
+
+$sid = New-Object System.Security.Principal.SecurityIdentifier $uname.SID
+
+$oul = Get-ADGroup -Identity $gname | Select-Object -ExpandProperty DistinguishedName
+$acl = Get-Acl -Path "AD:\$oul"
+$ace = New-Object System.DirectoryServices.ActiveDirectoryAccessRule ($sid, “ListChildren, ReadProperty, GenericWrite”, “Allow”)
+$acl.AddAccessRule($ace)
+Set-ADObject -Identity $oul -Replace @{nTSecurityDescriptor=$acl} -Server $DC.HostName -Credential $Creds
+
+}
+
+
+
+$cred =Get-Credential
+$csv = Import-Csv "C:\Temp\book1.csv"
+foreach($l in $csv)
+{
+$Name = $l.Name
+$password = ConvertTo-SecureString $l.Password -AsPlainText -Force -ErrorAction SilentlyContinue
+
+
+Set-ADAccountPassword $Name -NewPassword $password -Credential $cred
+Set-ADUser $Name -ChangePasswordAtLogon $false -Credential $cred
 }
