@@ -1,42 +1,315 @@
+####################################################################################
+# Created on:    22/09/2015                                                        #
+# Last Modified: 22/09/2015                                                        #
+# Author:        Benjamin Cash                                                     #
+# Version:       1.0.0                                                             #
+# Purpose:       To create multiple distribution lists                             #
+#                                                                                  #
+# History:                                                                         #
+# v1.1 - Added logging to master log - Andy Congdon 24/6/16                        #
+####################################################################################
 
+Import-Module ActiveDirectory
 
-.box{
-    text-align: center;
-    padding-top: 50px;
-    border: 1px,black, solid;
-    height: 300px;
-    width: 300px;
-    box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;
+$ErrorActionPreference = "silentlycontinue"
+
+$Creds = Get-credential
+$DC = Get-ADDomainController
+
+$csv = Import-Csv "C:\Temp\Book1.csv"
+
+Function Header
+{
+    Write-Host "****************************************************************************" -ForegroundColor Cyan
+    Write-Host "                      Sainsbury's Supermarkets LTD                          " -ForegroundColor Cyan
+    Write-Host "                       Distribution List Creation                           " -ForegroundColor Cyan
+    Write-Host "                             Version: 1.0.0                                 " -ForegroundColor Cyan
+    Write-Host "****************************************************************************" -ForegroundColor Cyan
 }
-.App{
-    text-align: center;
-    padding-left: 40%;
-    padding-top: 10%;
+
+Function Connect-Exchange
+{
+
+    $session = New-Pssession -Credential $Creds -ConfigurationName Microsoft.Exchange -Authentication Kerberos -ConnectionUri http://prodwin0266.bc.jsplc.net/PowerShell -AllowRedirection
+    Import-PSSession $session -AllowClobber | Out-Null
+    #clear
+
+}
+
+Function List-Validation
+{
+
+    If ($csv -eq $null)
+    {
+        Write-Host "The csv is not available" -BackgroundColor Red -ForegroundColor DarkRed
+        Exit
     }
 
-    .Add{
-height: 60px;
-width: 120px;
-background-color: green;
-margin: auto;
-border-radius: 12px 12px;
-margin-right: 10px;
-  }
-
-    .Sub{
-        height: 60px;
-width: 120px;
-        background-color: red;
-        margin: auto;
-        border-radius: 12px 12px;
+    Foreach ($l in $csv)
         
+        {
+
+            $Name = $l.Name
+            $Description = $l.Description
+            $Owner = $l.Owner
+            $Members = $l.Members
+
+   If ((Get-ADGroup $name -WarningAction SilentlyContinue) -ne $null)
+                {
+                   Write-Host "The group $Name already exists" -BackgroundColor Yellow -ForegroundColor Black
+                   Exit
+               }
+
+            If ((Get-Aduser $owner -WarningAction SilentlyContinue) -eq $null)
+                {
+                    Write-Host "The owner $Owner does not exist" -ForegroundColor Black -BackgroundColor Yellow
+                    Exit
+                }
+
+            If ($Members -ne $null)
+                {
+                    $members = $Members -split ";"
+
+                    Foreach ($a in $members)
+                        
+                        {
+
+                            $user = Get-ADUser $a -Server $DC.HostName -WarningAction SilentlyContinue
+
+                            If ($user -eq $null)
+                                {
+                                    Write-Host "Member $a does not exist" -BackgroundColor DarkRed -ForegroundColor Red
+                                    Exit
+                                }
+
+                            Remove-Variable -Name user
+                        }
+                }
+        
+        }    Write-Host "Validation Complete" -BackgroundColor Green -ForegroundColor DarkGreen
+}
+
+Function DistList-Enable
+
+{
+
+    Foreach ($l in $csv)
+
+    {
+            
+        $Name = $l.Name
+        $Description = $l.Description
+        $Owner = $l.Owner
+        $Sowner = $l.Sowner
+        $Members = $l.Members
+        $Members = $Members -split ";"
+        $GName = Get-Adgroup $Name
+    
+       New-ADGroup -Name $Name -Credential $Creds -DisplayName $Name -Description "Owner: $Owner" -ManagedBy $Owner -SamAccountName $Name -GroupCategory Distribution -GroupScope Universal -Path "OU=JS Distribution Lists,OU=Synchronisation,OU=Services,DC=BC,DC=JSPLC,DC=NET"# -Server $DC.HostName
+        Start-Sleep 10
+        Set-ADGroup $Name -Add @{info=$Description} -Credential $Creds -Server $DC.HostName
+       Enable-DistributionGroup $Name -Alias $name -primarysmtpaddress ($Name+"@sainsburys.co.uk") -DomainController $DC.HostName | Out-Null
+        Set-DistributionGroup $name -EmailAddressPolicyEnabled $true -DomainController $DC.HostName
+        
+        Start-Sleep 30
+            Set-ADGroup $Name -Description "Owner: $Sowner"  -Server $DC.HostName -Credential $Creds
+        Foreach ($u in $Members)
+            {
+                $member = Get-Aduser $u 
+                Add-ADGroupMember $GName -Members $member.samAccountName -Server $DC.HostName -Credential $Creds
+
+            }
+
     }
 
-    .Res{
-        height: 60px;
-        width: 120px;
-        margin-top: 20px;
-        background-color: blue;
-       
-        border-radius: 12px 12px; 
+}
+
+Function Owner-Security
+{
+    Foreach ($l in $csv)
+
+    {
+        $Name = $l.Name
+        $Sowner = $l.Sowner
+      $gname = Get-ADGroup $Name
+      $Sowner = $Sowner-split";"
+
+Foreach ($u in $Sowner)
+{
+
+    
+
+$uname = Get-ADUser $u
+
+$sid = New-Object System.Security.Principal.SecurityIdentifier $uname.SID
+
+$oul = Get-ADGroup -Identity $gname | Select-Object -ExpandProperty DistinguishedName
+$acl = Get-Acl -Path "AD:\$oul"
+$ace = New-Object System.DirectoryServices.ActiveDirectoryAccessRule ($sid, “ListChildren, ReadProperty, GenericWrite”, “Allow”)
+$acl.AddAccessRule($ace)
+Set-ADObject -Identity $oul -Replace @{nTSecurityDescriptor=$acl} -Server $DC.HostName -Credential $Creds
+
+}
+
+  }
+Write-Host "Security Applied" -BackgroundColor Green -ForegroundColor DarkGreen
+
+  
+}
+
+Function Reporting
+{
+
+    Foreach ($l in $csv)
+    
+        {
+            $Name = Get-Adgroup $l.Name -Properties whencreated
+            $Description = $l.Description
+            $Owner = $l.Owner
+            $creator = whoami
+
+            $object = New-Object psobject
+            $object | Add-Member "Distribution List Name" $Name.samAccountName
+            $object | Add-member "Owner" $Owner
+            $object | Add-Member "When Created" $Name.WhenCreated
+            $object | Add-Member "Creator" $Creator
+            $object | Export-csv "\\prodwin0358\ITSA Scripts\Reporting\Distribution Lists\Creation History.csv" -Append -NoTypeInformation
+        }
+}
+
+Function Script-Log
+{
+    Foreach ($l in $csv)
+    {
+    # Logs to master log file
+
+    $Request = "Distribution List"
+    $date = (get-date).ToString('dd/MM/yy')
+    $whoami = whoami
+    $whoami = $whoami.split("\")
+    $whoami = $whoami[1]
+
+    if ($whoami -like "*jsadmint*")
+ 
+    {
+        $whoami = get-aduser $whoami -Properties extensionattribute1 | select extensionattribute1
+        $whoami = $whoami.extensionattribute1
     }
+
+    else {$whoami = (get-culture).textinfo.totitlecase("$whoami")}
+
+    $Output = New-Object PSObject
+    $Output | Add-Member Request $request
+    $Output | Add-Member Date $date
+    $Output | Add-Member Name $whoami
+
+    $Output | Export-Csv -Path "\\PRODWIN0358\ITSA Scripts\Reporting\ScriptHistory.csv" -NoTypeInformation -Append
+    
+}
+}
+
+Function MailSend
+{
+
+$csv = Import-Csv "C:\Temp\Book1.csv"
+
+ForEach ($l in $csv)
+{
+$Name = $l.Name
+$Owner= $l.Owner
+$Mail = Get-ADGroup $Name -Properties mail | select -ExpandProperty mail
+
+
+
+Function 28DayMsg {
+Write-Output @"
+<font face="Calibri"><p>Hello,</p>
+
+<br/>
+
+Your request for a new distribution list has now been completed. 
+<br/>
+<br/>
+Distribution List Name :  $fullDot   
+<br/>
+Distribution List Owner(s) : $Sowner    
+
+<br/>
+
+<br/>
+Owners of the list are able to add and remove members using the Search Directory application in Windows 10, Please make sure if you connected with sainsburys network\VPN before doing any changes. please see instructions attached. 
+<br/>
+Please call the DT Service Desk on 0345 603 4401 if you have any problems." 
+<br/><br/><br/>
+Thanks & Regards
+<br/>
+S.Nagalingam
+<br/>
+Tata Consultancy Services Ltd
+<br/>
+Sainsbury’s Tech Security Admin
+<br/>
+TCS – Infrastructure
+<br/>
+Nagalingam.S@sainsburys.co.uk
+<br/>
+0345 603 2638
+<br/></font>
+"@
+
+[string]$body28= 28DayMsg
+
+
+Send-MailMessage -to $to -bcc $bcc -from $from -SmtpServer $server -BodyAsHtml:$true -Body $body28 -Subject $subject28
+#Script end
+
+}
+}
+}
+################################################################################################
+                $path = "\\prodwin0358\ITSA Scripts\DTSA Mailbox\Pokedex\Pokemon"
+                
+                $phrases =  Get-ChildItem "\\prodwin0358\ITSA Scripts\DTSA Mailbox\Pokedex\Pokemon"
+
+                $pokemon = Get-Random $phrases
+
+
+
+                Get-Content $path\$pokemon
+                $pokemon = $pokemon.Name
+                $pokemon = $pokemon.Split(".")
+                $pokemon = $pokemon[0] 
+
+                $whoami = whoami
+                $whoami = $whoami.split("\")
+                $whoami = $whoami[1]
+
+                if ($whoami -like "*jsadmint*")
+ 
+                {
+                $whoami = get-aduser $whoami -Properties extensionattribute1 | select extensionattribute1
+                $whoami = $whoami.extensionattribute1
+                }
+
+                else {$whoami = (get-culture).textinfo.totitlecase("$whoami")}
+
+
+                $Output1 = New-Object PSObject
+                $Output1 | Add-Member Pokemon $pokemon
+                $Output1 | Add-Member Name $whoami
+
+                $Output1 | Export-Csv -Path "\\prodwin0358\ITSA Scripts\DTSA Mailbox\Pokedex\Caught.csv" -NoTypeInformation -Append
+################################################################################################
+Connect-Exchange
+Header
+#List-Validation
+#DistList-Enable
+#Start-Sleep 20
+Owner-Security
+#Reporting
+#Script-Log
+#MailSend
+Get-Pssession | Remove-PSSession
+Write-Host "Script Complete" -BackgroundColor Green -for Black
+#Exit
+
